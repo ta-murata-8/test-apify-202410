@@ -1,54 +1,43 @@
-from apify_client import ApifyClient
 import requests
 from bs4 import BeautifulSoup
+from apify_client import ApifyClient
 
 # Apifyクライアントの初期化
-client = ApifyClient('your-apify-token')  # ApifyのAPIトークンを入力
+client = ApifyClient('ここにはapifyのクライアントキーを入れる')
 
-# スクレイピング対象のURL
-url = 'https://itp.ne.jp/keyword?area=13&areaword=%E6%9D%B1%E4%BA%AC%E9%83%BD&keyword=%E8%BE%B2%E6%A5%AD&sbmap=false&sort=01'
+async def main() -> None:
 
-def scrape_data(url):
-    # ページの内容を取得
+    # プレスリリースページのURL
+    url = "https://prtimes.jp/technology/"
+
+
+    # ページをリクエスト
     response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-    # 企業名と電話番号の抽出
-    companies = []
-    
-    # 企業名を含む<a>タグを探す
-    for link in soup.find_all('a', href=True):
-        if 'info' in link['href']:  # href属性に"info"が含まれているものをフィルタリング
-            name = link.text.strip()  # 企業名の取得
-            
-            # 対応する電話番号の取得
-            phone_element = link.find_next('span', class_='wixui-rich-text__text')
-            phone = phone_element.text.strip() if phone_element else 'N/A'
-            
-            companies.append({'name': name, 'phone': phone})
-    
-    return companies
+    # プレスリリース情報を抽出
+    press_releases = []
+    for article in soup.select('article.list-article'):
+        title = article.select_one('h3.list-article__title').get_text(strip=True)
+        company = article.select_one('span.list-article__company-name--dummy').get_text(strip=True)
+        date = article.select_one('time').get('datetime')
+        link = article.select_one('a').get('href')
 
-# Apify上でActorの作成
-def create_actor():
-    # 収集データのリクエスト
-    actor_input = {
-        "startUrls": [{"url": url}]
-    }
+        press_releases.append({
+            'title': title,
+            'company': company,
+            'date': date,
+            'link': f"https://prtimes.jp{link}"
+        })
 
-    # Actorを起動し、結果を取得
-    run = client.actor('apify/web-scraper').call(actor_input)
-    
-    # 結果を表示
-    dataset_id = run['defaultDatasetId']
-    items = client.dataset(dataset_id).list_items().items
-    return items
+    # 結果を出力
+    for release in press_releases:
+        print(f"Title: {release['title']}")
+        print(f"Company: {release['company']}")
+        print(f"Date: {release['date']}")
+        print(f"Link: {release['link']}")
+        print("------")
 
-if __name__ == "__main__":
-    scraped_data = scrape_data(url)
-    for company in scraped_data:
-        print(f"Company Name: {company['name']}, Phone: {company['phone']}")
-    
-    # Actorで実行した場合
-    actor_data = create_actor()
-    print(actor_data)
+    # 取得したデータをApifyのデータセットに保存
+    run = client.actor('apify/hello-world').call()
+    client.dataset(run['defaultDatasetId']).push_items(press_releases)
