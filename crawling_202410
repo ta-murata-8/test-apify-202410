@@ -1,0 +1,49 @@
+from apify_client import ApifyClient
+import requests
+from bs4 import BeautifulSoup
+
+# Apifyクライアントの初期化
+client = ApifyClient('your-apify-token')  # ApifyのAPIトークンを入力
+
+# スクレイピング対象のURL
+url = 'https://itp.ne.jp/keyword?area=13&areaword=%E6%9D%B1%E4%BA%AC%E9%83%BD&keyword=%E8%BE%B2%E6%A5%AD&sbmap=false&sort=01'
+
+def scrape_data(url):
+    # ページの内容を取得
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # 企業名と電話番号の抽出
+    companies = []
+    listings = soup.find_all('div', class_='o-txListing')  # HTMLクラスに基づく要素の特定（クラスは調整が必要かもしれません）
+    
+    for listing in listings:
+        name = listing.find('span', class_='o-txListing__name').text.strip()  # 企業名の取得
+        phone = listing.find('span', class_='o-txListing__tel').text.strip()  # 電話番号の取得
+        companies.append({'name': name, 'phone': phone})
+    
+    return companies
+
+# Apify上でActorの作成
+def create_actor():
+    # 収集データのリクエスト
+    actor_input = {
+        "startUrls": [{"url": url}]
+    }
+
+    # Actorを起動し、結果を取得
+    run = client.actor('apify/web-scraper').call(actor_input)
+    
+    # 結果を表示
+    dataset_id = run['defaultDatasetId']
+    items = client.dataset(dataset_id).list_items().items
+    return items
+
+if __name__ == "__main__":
+    scraped_data = scrape_data(url)
+    for company in scraped_data:
+        print(f"Company Name: {company['name']}, Phone: {company['phone']}")
+    
+    # Actorで実行した場合
+    actor_data = create_actor()
+    print(actor_data)
