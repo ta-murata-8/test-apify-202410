@@ -15,12 +15,17 @@ def scrape_data(url):
 
     # 企業名と電話番号の抽出
     companies = []
-    listings = soup.find_all('div', class_='o-txListing')  # HTMLクラスに基づく要素の特定（クラスは調整が必要かもしれません）
     
-    for listing in listings:
-        name = listing.find('span', class_='o-txListing__name').text.strip()  # 企業名の取得
-        phone = listing.find('span', class_='o-txListing__tel').text.strip()  # 電話番号の取得
-        companies.append({'name': name, 'phone': phone})
+    # 企業名を含む<a>タグを探す
+    for link in soup.find_all('a', href=True):
+        if 'info' in link['href']:  # href属性に"info"が含まれているものをフィルタリング
+            name = link.text.strip()  # 企業名の取得
+            
+            # 対応する電話番号の取得
+            phone_element = link.find_next('span', class_='wixui-rich-text__text')
+            phone = phone_element.text.strip() if phone_element else 'N/A'
+            
+            companies.append({'name': name, 'phone': phone})
     
     return companies
 
